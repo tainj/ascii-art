@@ -1,0 +1,51 @@
+# Бинарные файлы и исполняемые файлы
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Скомпилированные Go-файлы
+*.out
+*.test
+*.prof
+
+# Локальные бинарники, созданные go build/install
+/bin/
+/build/
+
+# IDE и редакторы
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+
+# ОС
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Тестовые артефакты
+cover.out
+coverage.txt
+
+# Логи и временные файлы
+*.log
+tmp/
+temp/
+
+# Docker
+.dockerignore
+
+# Личные настройки (например, локальные env-файлы)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Go модули
+go.sum
