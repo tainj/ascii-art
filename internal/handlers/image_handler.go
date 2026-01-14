@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"asscll_art/internal/services"
 	"fmt"
 	"log"
 	"net/http"
@@ -21,6 +22,11 @@ func UploadHandler(c *gin.Context) {
 	dst := path.Join("./temp", file.Filename)
 
 	c.SaveUploadedFile(file, dst)
+
+	_, err = services.ConvertToASCII(dst)
+	if err != nil {
+		c.String(http.StatusRequestEntityTooLarge, fmt.Sprintf("file is too big"))
+	}
 
     c.String(http.StatusOK, fmt.Sprintf("'%s' uploaded!", file.Filename))
 }
