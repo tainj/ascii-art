@@ -1,7 +1,6 @@
 package services
 
 import (
-	"errors"
 	"image"
 	"image/color"
 	"image/draw"
@@ -9,18 +8,33 @@ import (
 	"os"
 	"path"
 	"math"
-
-	"github.com/disintegration/imaging"
-	"github.com/nfnt/resize"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/basicfont"
 	"golang.org/x/image/math/fixed"
 )
 
-var asciiChars = []rune("$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;:,\"^`'. ")
+var asciiChars = []rune{ // Палитра
+    '█',
+    '▓', 
+    '▒', 
+    '░', 
+    '#', 
+    '&', 
+    '@', 
+    '%', 
+    '$', 
+    '+', 
+    '=', 
+    'o', 
+    '*', 
+    ':', 
+    '-', 
+    '.', 
+    ' ', // Пробел (самый светлый)
+}
 var charLen = len(asciiChars)
 
-func ScaleGrayImageJpg(filePath string, widthSymbols int) (image.Image, error) {
+func ScaleGrayImage(filePath string, widthSymbols int) (image.Image, error) {
 	// Открываем файл
 	imgIn, err := os.Open(filePath)
 	if err != nil {
@@ -29,32 +43,38 @@ func ScaleGrayImageJpg(filePath string, widthSymbols int) (image.Image, error) {
 	defer imgIn.Close()
 
 	// Получаем файл
-	imgJpg, err := jpeg.Decode(imgIn)
+	img, _, err := image.Decode(imgIn)
 	if err != nil {
 		return nil, err
 	}
 
 	// Считаем высоту
-	heightSymbols := int(imgJpg.Bounds().Dy() / imgJpg.Bounds().Dx() * widthSymbols)
-	heightSymbolInPixel := int(math.Round(float64(imgJpg.Bounds().Dy()) / float64(heightSymbols)))
-
-	widthSymbolInPixel := int(math.Round(float64(float64(imgJpg.Bounds().Dx()) / float64(widthSymbols))))
+	heightSymbols := int(math.Round(float64(img.Bounds().Dy()) / float64(img.Bounds().Dx()) * float64(widthSymbols)) / 2.0)
 
 	// Новое изображение
 	dst := image.NewGray(image.Rect(0, 0, widthSymbols, heightSymbols))
 
 	// Преобразуем в серый цвет
-	bounds := imgJpg.Bounds()
-	for y := 0; y < heightSymbols; y++ {
-		for x := 0; x < widthSymbols; x++ {
+	bounds := img.Bounds()
+	for y := range heightSymbols {
+        // Определяем границы пикселей, которые мы рассматриваем
+
+        startY := int(math.Floor(float64(y) * float64(bounds.Dy() / heightSymbols)))
+        endY := int(math.Ceil(float64(y + 1) * float64((bounds.Dy() / heightSymbols))))
+		for x := range widthSymbols {
+            // Определяем границы пикселей, которые мы рассматриваем
+
+            startX := int(math.Floor(float64(x) * float64(bounds.Dx() / widthSymbols)))
+            endX := int(math.Ceil(float64(x + 1) * float64((bounds.Dx() / widthSymbols))))
 			var flow uint32
-			for i := 0; i < heightSymbolInPixel; i++ {
-				for j := 0; j < widthSymbolInPixel; j++ {
-					r, g, b, _ := imgJpg.At(bounds.Min.X + x * widthSymbolInPixel + j, bounds.Min.Y + y * heightSymbolInPixel + i).RGBA()
+
+			for i := startY; i < endY; i++ {
+				for j := startX; j < endX; j++ {
+					r, g, b, _ := img.At(j, i).RGBA()
 					flow += (r*299 + g*587 + b*114) / 1000
 				}
 			}
-			avgGray := uint8((flow / uint32(heightSymbolInPixel * widthSymbolInPixel)) >> 8) // 0-255
+            avgGray := uint8((flow / uint32((endX - startX) * (endY - startY))) >> 8)
             dst.SetGray(x, y, color.Gray{avgGray})
 		}
 	}
@@ -77,21 +97,13 @@ func ScaleGrayImageJpg(filePath string, widthSymbols int) (image.Image, error) {
 	return dst, nil
 }
 
-func ConvertToASCII(filePath string) (string, error) {
-    imgIn, _ := os.Open(filePath)
-    imgJpg, _ := jpeg.Decode(imgIn)
-    imgIn.Close()
-
-    imgJpg = resize.Resize(120, 120, imgJpg, resize.Bicubic)
-	imgJpg = imaging.Grayscale(imgJpg)
-
-    // Преобразование в ASCII
-    data := make([]string, 0)
-    bounds := imgJpg.Bounds()
+func ConvertImgToASCII(img image.Image) []string {
+    lines := make([]string, 0)
+    bounds := img.Bounds()
     for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
         s := ""
         for x := bounds.Min.X; x < bounds.Max.X; x++ {
-            r, _, _, _ := imgJpg.At(x, y).RGBA() // Достаточно одного компонента
+            r, _, _, _ := img.At(x, y).RGBA() // Достаточно одного компонента
             brightness := uint8(r >> 8)          // 0-255
             index := int(brightness) * (len(asciiChars) - 1) / 255
             if index >= len(asciiChars) { // Защита от выхода за границы
@@ -99,21 +111,19 @@ func ConvertToASCII(filePath string) (string, error) {
             }
             s += string(asciiChars[index])
         }
-        data = append(data, s)
+        lines = append(lines, s)
     }
+    return lines
+}
 
-    // Проверка на пустые данные
-    if len(data) == 0 || len(data[0]) == 0 {
-        return "", errors.New("ascii conversion produced empty data")
-    }
-
+func CreateImgFromASCII(lines []string) (string, error) {
     // Параметры шрифта (реальные размеры)
     const fontWidth = 7
     const fontHeight = 13
 
     // Создание холста
-    imgWidth := len(data[0]) * fontWidth
-    imgHeight := len(data) * fontHeight
+    imgWidth := len(lines[0]) * fontWidth
+    imgHeight := len(lines) * fontHeight
     canvas := image.NewRGBA(image.Rect(0, 0, imgWidth, imgHeight))
     draw.Draw(canvas, canvas.Bounds(), &image.Uniform{color.White}, image.Point{}, draw.Src)
 
@@ -124,7 +134,7 @@ func ConvertToASCII(filePath string) (string, error) {
         Face: basicfont.Face7x13,
     }
 
-    for i, line := range data {
+    for i, line := range lines {
         d.Dot = fixed.Point26_6{
             X: 0,
             Y: fixed.Int26_6((i+1)*fontHeight*64 - 3*64), // Вертикальное позиционирование
@@ -133,7 +143,7 @@ func ConvertToASCII(filePath string) (string, error) {
     }
 
     // Сохранение результата
-    outPath := path.Join("./temp", "ascii_art.jpg")
+    outPath := path.Join("./temp", "ascii_art3.jpg")
     if err := os.MkdirAll("./temp", 0755); err != nil {
         return "", err
     }

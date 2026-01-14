@@ -3,9 +3,8 @@ module asscll_art
 go 1.23.0
 
 require (
-	github.com/disintegration/imaging v1.6.2
 	github.com/gin-gonic/gin v1.11.0
-	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
+	golang.org/x/image v0.0.0-20191009234506-e7c1f5e7dbb8
 )
 
 require (
@@ -33,7 +32,6 @@ require (
 	go.uber.org/mock v0.5.0 // indirect
 	golang.org/x/arch v0.20.0 // indirect
 	golang.org/x/crypto v0.40.0 // indirect
-	golang.org/x/image v0.0.0-20191009234506-e7c1f5e7dbb8 // indirect
 	golang.org/x/mod v0.25.0 // indirect
 	golang.org/x/net v0.42.0 // indirect
 	golang.org/x/sync v0.16.0 // indirect

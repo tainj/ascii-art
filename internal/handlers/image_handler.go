@@ -23,12 +23,12 @@ func UploadHandler(c *gin.Context) {
 
 	c.SaveUploadedFile(file, dst)
 
-	_, err = services.ConvertToASCII(dst)
+	imgGray, err := services.ScaleGrayImage(dst, 200) 
 	if err != nil {
 		c.String(http.StatusRequestEntityTooLarge, "file is too big")
 	}
 
-	_, err = services.ScaleGrayImageJpg(dst, 120) 
+	_, err = services.CreateImgFromASCII(services.ConvertImgToASCII(imgGray))
 	if err != nil {
 		c.String(http.StatusRequestEntityTooLarge, "file is too big")
 	}
